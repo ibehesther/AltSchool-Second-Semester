@@ -1,6 +1,6 @@
 # AltSchool Africa Second Semester Assignment H
 
--  ### Improve your assignment G by expanding the functionality of each route, use filesystem as database as done in assignment E, but use NodeJS file handling module). All your routes must be authenticated. Ensure youwrite tests for each route
+-  ### Improve your assignment G by expanding the functionality of each route, use filesystem as database as done in assignment E, but use NodeJS file handling module). All your routes must be authenticated. Ensure you write tests for each route
    
     - ## Users:
         - CreateUser- register a new user
