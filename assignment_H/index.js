@@ -5,26 +5,65 @@ const fs = require("fs");
 const PORT = 8080;
 const dir = path.dirname(__filename)
 const path_to_user_db = path.join(__dirname, "db", "users.json")
+const path_to_test_user_db = path.join(__dirname, "db", "users_test.json")
 
-// content = [{
-//     test: "This is a test"
-// }]
-// fs.writeFile(path_to_db, content, (err, file) => {
-//     console.log(err, file)
-// })
 const getAllUsers = () => {
     return new Promise((resolve, reject) => {
-        fs.readFile(path_to_user_db,"utf-8", (err, file) => {
+        fs.readFile(path_to_user_db,"utf-8", (err, users) => {
             if(err) {
                 reject(err)
                 return
             }
-           resolve(JSON.parse(file));
+            if(users){
+                resolve(JSON.parse(users));
+                return
+            }
+            resolve([])
         })
     })
 }
 
-const authenticateAdmin = (req, res) => {
+const addUser = (req, res) => {
+    return new Promise((resolve, reject) => {
+        body = []
+        req.on('data', (chunk) => {
+            body.push(chunk);
+        });
+
+        req.on('end', async() => {
+            const parsedBody = Buffer.concat(body).toString()
+            if (!parsedBody){
+                reject({
+                    statusCode: 400,
+                    message: "Bad request"
+                });
+                return
+            }
+            const bodyObject = JSON.parse(parsedBody);
+            const { name, role, email, password } = bodyObject;
+
+            // Get all users from database file
+            const all_users = await getAllUsers()
+            if(!name || !role || !email || !password){
+                reject({
+                    statusCode: 400,
+                    message: "Bad Request"
+                });
+                return;
+            }
+            all_users.push(bodyObject);
+            fs.writeFile(path_to_user_db, JSON.stringify(all_users), (err) => {
+                if(err){
+                    reject(err)
+                }
+                resolve(JSON.stringify(bodyObject));
+            })
+           
+        })
+    })
+}
+
+const authenticateUser = (req, res) => {
     return new Promise((resolve, reject) => {
         body = []
         req.on("data", (chunk) => {
@@ -37,69 +76,77 @@ const authenticateAdmin = (req, res) => {
                 reject({
                     statusCode: 400,
                     message: "No username or password provided"
-                })
+                });
+                return;
             }
 
             parsedBody = JSON.parse(bufferString)
 
-           
             const users = await getAllUsers()
-            
-            for( let user of users){
-                if(user.email === parsedBody.email && user.password === parsedBody.password){
-                    if(user.role === "admin"){
-                        resolve(users)
-                        return 
-                    }else{
-                        reject({
-                            statusCode: 403,
-                            message: "Unauthorized"
-                        })
-                    }
-                }else{
-                    reject({
-                        statusCode: 401,
-                        message: "Unauthenticated"
-                    })
-                }
+            const authenticatedUser = users.filter((user) => user.email === parsedBody.email && user.password === parsedBody.password)
+            if(!authenticatedUser.length){
+                reject({
+                    statusCode: 401,
+                    message: "Unauthenticated"
+                })
+            }else{
+                resolve(authenticatedUser)
             }
         })
     })
+}
+
+const authenticateAdmin = async(req, res) => {
+    const all_users = await getAllUsers();
+    const authenticatedUser= await authenticateUser(req, res)
+    
+    if(authenticatedUser[0].role === "admin"){
+        return all_users
+    }else{
+        throw new Error();
+    }
 }
 
 const requestHandler = async(req, res) => {
     res.setHeader=["Content-Type", "application/json"]
     // CreateUser
     if(req.url === "/users" && req.method === "POST"){
-        body = []
-        req.on('data', (chunk) => {
-            body.push(chunk);
-        });
-
-        req.on('end', () => {
-            const parsedBody = Buffer.concat(body).toString()
-            const bodyObject = JSON.parse(parsedBody);
-
-            const { name, age, email, password } = bodyObject
+        const user = await addUser(req, res)
+        .then((user) => {
             res.statusCode = 201;
-            // res.end("Creating User...");
-            res.end(name);
+            res.end(user);
+        })
+        .catch((error) => {
+            res.statusCode = 400
+            res.end(JSON.stringify(error))
         })
     }
     // AuthenticateUser
     else if(req.url == "/users/auth" && req.method == "POST"){
-        res.end("Authenticating User...");
+        const user = await authenticateUser(req, res)
+        .then((user) => {
+            res.statusCode = 200;
+            res.end(JSON.stringify(user));
+        })
+        .catch((error) => {
+            res.statusCode = 400
+            res.end(JSON.stringify(error))
+        })
     }
     // GetAllUsers
     else if(req.url == "/users" && req.method == "GET"){
         try{
-            const users = await authenticateAdmin(req, res)
+            const users = await authenticateAdmin(req, res);
             res.end(JSON.stringify(users));
-        }catch(err){
-            res.statusCode = err.statusCode
-            res.end(JSON.stringify(err))
         }
-        
+        catch(err) {
+            const error = {
+                statusCode: 403,
+                message: "Unauthorized"
+            }
+            res.statusCode = 403
+            res.end(JSON.stringify(error))
+        }
     }
     // CreateBook
     else if(req.url == "/books" && req.method == "POST"){
