@@ -3,8 +3,8 @@ const path = require('path');
 const fs = require("fs");
 
 const PORT = 8080;
-const dir = path.dirname(__filename)
 const path_to_user_db = path.join(__dirname, "db", "users.json")
+const path_to_book_db = path.join(__dirname, "db", "books.json")
 const path_to_test_user_db = path.join(__dirname, "db", "users_test.json")
 
 const getAllUsers = () => {
@@ -22,10 +22,70 @@ const getAllUsers = () => {
         })
     })
 }
+const getAllBooks = () => {
+    return new Promise((resolve, reject) => {
+        fs.readFile(path_to_book_db,"utf-8", (err, users) => {
+            if(err) {
+                reject(err)
+                return
+            }
+            if(books){
+                resolve(JSON.parse(books));
+                return
+            }
+            resolve([])
+        })
+    })
+}
 
 const addUser = (req, res) => {
     return new Promise((resolve, reject) => {
         body = []
+        req.on('data', (chunk) => {
+            body.push(chunk);
+        });
+
+        req.on('end', async() => {
+            const parsedBody = Buffer.concat(body).toString()
+            if (!parsedBody){
+                reject({
+                    statusCode: 400,
+                    message: "Bad request"
+                });
+                return
+            }
+            const bodyObject = JSON.parse(parsedBody);
+            const { name, role, email, password } = bodyObject;
+
+            // Get all users from database file
+            const all_users = await getAllUsers()
+            if(!name || !role || !email || !password){
+                reject({
+                    statusCode: 400,
+                    message: "Bad Request"
+                });
+                return;
+            }
+            all_users.push(bodyObject);
+            fs.writeFile(path_to_user_db, JSON.stringify(all_users), (err) => {
+                if(err){
+                    reject(err)
+                }
+                resolve(JSON.stringify(bodyObject));
+            })
+           
+        })
+    })
+}
+
+const addBook = (req, res) => {
+    return new Promise(async(resolve, reject) => {
+        body = []
+        const user = await authenticateAdmin(req, res)
+        console.log(user);
+        // if(!user){
+
+        // }
         req.on('data', (chunk) => {
             body.push(chunk);
         });
@@ -84,7 +144,9 @@ const authenticateUser = (req, res) => {
 
             const users = await getAllUsers()
             const authenticatedUser = users.filter((user) => user.email === parsedBody.email && user.password === parsedBody.password)
+            console.log(authenticatedUser)
             if(!authenticatedUser.length){
+                console.log("here")
                 reject({
                     statusCode: 401,
                     message: "Unauthenticated"
@@ -103,8 +165,12 @@ const authenticateAdmin = async(req, res) => {
     if(authenticatedUser[0].role === "admin"){
         return all_users
     }else{
-        throw new Error();
+       return false;
     }
+}
+
+const loginUser = () => {
+
 }
 
 const requestHandler = async(req, res) => {
@@ -150,8 +216,15 @@ const requestHandler = async(req, res) => {
     }
     // CreateBook
     else if(req.url == "/books" && req.method == "POST"){
-        res.statusCode = 201;
-        res.end("Creating Book...");
+        const book = await addBook(req, res)
+        .then((book) => {
+            res.statusCode = 201;
+            res.end(book);
+        })
+        .catch((error) => {
+            res.statusCode = 400
+            res.end(JSON.stringify(error))
+        })
     }
     // DeleteBook
     else if(req.url == "/books" && req.method == "DELETE"){
