@@ -1,1 +1,1 @@
-[{"email":"esther123@example.com","password":"esther_password","book":{"author":"Chinua Achebe","title":"Things Fall Apart","year":2002}},{"email":"esther123@example.com","password":"esther_password","book":{"author":"Chinua Achebe","title":"Things Fall Apart","year":2002}}]
+[{"author":"Chinua Achebe","title":"Things Fall Apart","year":1958,"available":true},{"author":"Chimamanda Ngozi Adiche","title":"Half of a Yellow Sun","year":2006,"available":false},{"author":"Chimamanda Ngozi Adiche","title":"Purple Hibiscus","year":2003,"available":true}]
