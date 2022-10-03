@@ -141,19 +141,11 @@ const addBook = (req, res) => {
                 return;
             }
             for(let book of books){
-                if(all_books.length == 0){
-                    new_book= {
-                        id: 1,...book, available: true
-                    }
-                    all_books.push(new_book);
-                }else{
-                    const id =all_books.length + 1
-                    new_book= {
-                        id,...book, available: true
-                    }
-                    all_books.push(new_book);
+                const id =all_books.length+1
+                new_book= {
+                    id,...book, available: true
                 }
-                
+                all_books.push(new_book);
             }
             fs.writeFile(path_to_book_db, JSON.stringify(all_books), (err) => {
                 if(err){
@@ -464,66 +456,68 @@ const updateBook = (req, res) => {
                 return;
             }
             const bodyObject = JSON.parse(parsedBody);
-            const { books, email, password } = bodyObject;
-
-            const user = await authenticateUser(email, password);
-            if(!user){
+            let { id, author, title, year, email, password } = bodyObject;
+            if(!id){
                 reject({
-                    statusCode: 401,
-                    message: "Not Authenticated"
+                    statusCode: 400,
+                    message: "Bad Request"
                 });
                 return;
             }
+            const users = await authenticateAdmin(email, password);
+            if(users.statusCode){
+                reject(users);
+                return;
+            }
             let all_books = await getBooks();
-            let books_to_return = [];
-            for(let book of books){
-                const title = book.title.trim();
-                if(!title){
-                    reject({
-                        statusCode: 400,
-                        message: "Bad Request"
-                    });
-                    return;
-                }
-                // Check if the book is not available
-                let book_to_return = all_books.filter(in_book => in_book.title.trim() === title);
-                if(!book_to_return.length){
-                    reject({
-                        statusCode: 404,
-                        message: "Not found"
-                    });
-                    return;
-                }
-                book_to_return.forEach(book => {
-                    if(book.available == false){
-                        all_books.forEach((book) => {
-                            if(book.title === title){
-                                if(book.available === false){
-                                   book.available = true
+            let updated_book = [];
+            title = title && title.trim();
+            // Check if the book exists
+            let book_to_update = all_books.filter(in_book => in_book.id === parseInt(id));
+            if(!book_to_update.length){
+                reject({
+                    statusCode: 404,
+                    message: "Not found"
+                });
+                return;
+            }
+            book_to_update.forEach(book => {
+                if(book.available == true){
+                    all_books.forEach((book) => {
+                        if(book.id === id){
+                            if(book.available === true){
+                                if(author){
+                                    book.author = author;
+                                }
+                                if(title){
+                                    book.title = title;
+                                }
+                                if(year){
+                                    book.year = year;
                                 }
                             }
-                        })
-                        console.log(all_books)
-                        fs.writeFile(path_to_book_db, JSON.stringify(all_books), (err) => {
-                            if(err){
-                                reject(err)
-                            }
-                        })
-                        message = {
-                            title: title,
-                            message: "Book has been returned by you!"
                         }
-                        books_to_return.push(message)
-                    }else{
-                        message = {
-                            title: title,
-                            message: "Book was not loaned!"
+                    })
+                    fs.writeFile(path_to_book_db, JSON.stringify(all_books), (err) => {
+                        if(err){
+                            reject(err);
+                            return;
                         }
-                        books_to_return.push(message)
+                    })
+                    message = {
+                        id,
+                        message: "Book has been updated!"
                     }
-                });
-            }
-            resolve(JSON.stringify(books_to_return));
+                    updated_book.push(message)
+                }else{
+                    message = {
+                        id,
+                        message: "Book is not available to be updated!"
+                    }
+                    updated_book.push(message)
+                }
+            });
+            resolve(JSON.stringify(updated_book));
         })
     })
 }
