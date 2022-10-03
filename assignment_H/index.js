@@ -107,7 +107,6 @@ const addUser = (req, res) => {
     })
 }
 
-
 const addBook = (req, res) => {
     return new Promise((resolve, reject) => {
         body = []
@@ -133,7 +132,7 @@ const addBook = (req, res) => {
                 return
             }
             // Get all books from database file
-            const all_books = await getBooks()
+            let all_books = await getBooks()
             if(!books){
                 reject({
                     statusCode: 400,
@@ -142,10 +141,19 @@ const addBook = (req, res) => {
                 return;
             }
             for(let book of books){
-                new_book= {
-                    ...book, available: true
+                if(all_books.length == 0){
+                    new_book= {
+                        id: 1,...book, available: true
+                    }
+                    all_books.push(new_book);
+                }else{
+                    const id =all_books.length + 1
+                    new_book= {
+                        id,...book, available: true
+                    }
+                    all_books.push(new_book);
                 }
-                all_books.push(new_book);
+                
             }
             fs.writeFile(path_to_book_db, JSON.stringify(all_books), (err) => {
                 if(err){
@@ -326,13 +334,30 @@ const loanBook = (req, res) => {
                 }
                 book_to_loan.forEach(book => {
                     if(book.available == false){
-                        error = {
-                         title: title,
-                         message: "Book is not available!"
+                        message = {
+                            title: title,
+                            message: "Book is not available!"
                         }
-                        books_to_loan.push(error)
+                        books_to_loan.push(message)
                     }else{
-                        books_to_loan.push(...book_to_loan)
+                        // change the status of book from "available=true" to "available=false"
+                        all_books.forEach((book) => {
+                            if(book.title == title){
+                                if(book.available == true){
+                                   book.available = false
+                                }
+                            }
+                        })
+                        fs.writeFile(path_to_book_db, JSON.stringify(all_books), (err) => {
+                            if(err){
+                                reject(err)
+                            }
+                        })
+                        message = {
+                            title: title,
+                            message: "Book has been loaned to you!"
+                        }
+                        books_to_loan.push(message)
                     }
                 });
             }
@@ -369,7 +394,7 @@ const returnBook = (req, res) => {
                 return;
             }
             let all_books = await getBooks();
-            let books_to_loan = [];
+            let books_to_return = [];
             for(let book of books){
                 const title = book.title.trim();
                 if(!title){
@@ -379,28 +404,126 @@ const returnBook = (req, res) => {
                     });
                     return;
                 }
-                // Check if the book is available
-                let book_to_loan = all_books.filter(in_book => in_book.title.trim() === title);
-                if(!book_to_loan.length){
+                // Check if the book is not available
+                let book_to_return = all_books.filter(in_book => in_book.title.trim() === title);
+                if(!book_to_return.length){
                     reject({
                         statusCode: 404,
                         message: "Not found"
                     });
                     return;
                 }
-                book_to_loan.forEach(book => {
+                book_to_return.forEach(book => {
                     if(book.available == false){
-                        error = {
-                         title: title,
-                         message: "Book is not available!"
+                        all_books.forEach((book) => {
+                            if(book.title === title){
+                                if(book.available === false){
+                                   book.available = true
+                                }
+                            }
+                        })
+                        console.log(all_books)
+                        fs.writeFile(path_to_book_db, JSON.stringify(all_books), (err) => {
+                            if(err){
+                                reject(err)
+                            }
+                        })
+                        message = {
+                            title: title,
+                            message: "Book has been returned by you!"
                         }
-                        books_to_loan.push(error)
+                        books_to_return.push(message)
                     }else{
-                        books_to_loan.push(...book_to_loan)
+                        message = {
+                            title: title,
+                            message: "Book was not loaned!"
+                        }
+                        books_to_return.push(message)
                     }
                 });
             }
-            resolve(JSON.stringify(books_to_loan));
+            resolve(JSON.stringify(books_to_return));
+        })
+    })
+}
+
+const updateBook = (req, res) => {
+    return new Promise((resolve, reject) => {
+        body = []
+        req.on('data', (chunk) => {
+            body.push(chunk);
+        });
+
+        req.on('end', async() => {
+            const parsedBody = Buffer.concat(body).toString()
+            if (!parsedBody){
+                reject({
+                    statusCode: 400,
+                    message: "Bad request"
+                });
+                return;
+            }
+            const bodyObject = JSON.parse(parsedBody);
+            const { books, email, password } = bodyObject;
+
+            const user = await authenticateUser(email, password);
+            if(!user){
+                reject({
+                    statusCode: 401,
+                    message: "Not Authenticated"
+                });
+                return;
+            }
+            let all_books = await getBooks();
+            let books_to_return = [];
+            for(let book of books){
+                const title = book.title.trim();
+                if(!title){
+                    reject({
+                        statusCode: 400,
+                        message: "Bad Request"
+                    });
+                    return;
+                }
+                // Check if the book is not available
+                let book_to_return = all_books.filter(in_book => in_book.title.trim() === title);
+                if(!book_to_return.length){
+                    reject({
+                        statusCode: 404,
+                        message: "Not found"
+                    });
+                    return;
+                }
+                book_to_return.forEach(book => {
+                    if(book.available == false){
+                        all_books.forEach((book) => {
+                            if(book.title === title){
+                                if(book.available === false){
+                                   book.available = true
+                                }
+                            }
+                        })
+                        console.log(all_books)
+                        fs.writeFile(path_to_book_db, JSON.stringify(all_books), (err) => {
+                            if(err){
+                                reject(err)
+                            }
+                        })
+                        message = {
+                            title: title,
+                            message: "Book has been returned by you!"
+                        }
+                        books_to_return.push(message)
+                    }else{
+                        message = {
+                            title: title,
+                            message: "Book was not loaned!"
+                        }
+                        books_to_return.push(message)
+                    }
+                });
+            }
+            resolve(JSON.stringify(books_to_return));
         })
     })
 }
@@ -489,7 +612,14 @@ const requestHandler = async(req, res) => {
     }
     // UpdateBook
     else if(req.url == "/books" && req.method == "PUT"){
-        res.end("Updating Book...");
+        const book = await updateBook(req, res)
+        .then((book) => {
+            res.end(book);
+        })
+        .catch((error) => {
+            res.statusCode = error.statusCode
+            res.end(JSON.stringify(error));
+        })
     }else{
         res.statusCode = 404;
         res.end("Route not found");
@@ -500,17 +630,21 @@ const requestHandler = async(req, res) => {
 //     "email": "esther123@example.com",
 //     "password": "esther_password",
 //     "books": [{
-//       "author": "Chinua Achebe",
-//       "title": "Things Fall Apart",
-//       "year": 1958
+//         "author": "Chinua Achebe",
+//         "title": "Things Fall Apart",
+//         "year": 1958
 //     },{
-//       "author": "Chimamanda Ngozi Adiche",
-//       "title": "Half of a Yellow Sun",
-//       "year": 2006
+//         "author": "Chimamanda Ngozi Adiche",
+//         "title": "Half of a Yellow Sun",
+//         "year": 2006
 //     },{
-//       "author": "Chimamanda Ngozi Adiche",
-//       "title": "Purple Hibiscus",
-//       "year": 2003
+//         "author": "Chimamanda Ngozi Adiche",
+//         "title": "Purple Hibiscus",
+//         "year": 2003
+//     },{
+//         "author": "Wole Soyinka",
+//         "title": "Chronicles from the Land of the Happiest People on Earth",
+//         "year": 2021
 //     }]
 // }
 
