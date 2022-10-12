@@ -1,0 +1,19 @@
+{
+  "name": "assignment_i",
+  "version": "1.0.0",
+  "description": "- A new Route\r     - Profile: Allow users to add some more information about themselves including phone, and address.\r     - Books should have preview image\r     - Books should have pdf snippets\r - Add a timeline to books loaned and add penalty for late return\r - Don't forget to add proper user interative feedback on each route\r - Write tests for each route using any of the TDD frameworksyou have been introduced to",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.20"
+  }
+}
